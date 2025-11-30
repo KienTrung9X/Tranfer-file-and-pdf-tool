@@ -93,6 +93,11 @@ export const Upload: React.FC = () => {
                   <input type="file" className="hidden" multiple onChange={(e) => console.log(e.target.files)} />
                 </label>
               </div>
+              
+              <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 rounded-md text-sm">
+                <span className="material-symbols-outlined text-lg">timer</span>
+                <span>Lưu ý: File sẽ tự động bị xóa vĩnh viễn sau 30 phút.</span>
+              </div>
             </div>
           </div>
 
@@ -117,7 +122,7 @@ export const Upload: React.FC = () => {
               </div>
               
               <div className="flex w-full max-w-xs flex-col items-center gap-3">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Mã của bạn</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Mã của bạn (Hết hạn sau 30p)</p>
                 <div className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-background-light p-3 dark:border-white/10 dark:bg-background-dark">
                   <span className="flex-1 text-center text-xl font-semibold tracking-widest text-gray-700 dark:text-gray-300">
                     {sessionCode || '...'}
