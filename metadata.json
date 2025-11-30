@@ -1,0 +1,5 @@
+{
+  "name": "FileTransfer Pro",
+  "description": "A secure and fast file transfer application supporting cross-device sharing via Supabase.",
+  "requestFramePermissions": []
+}
