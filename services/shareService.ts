@@ -1,76 +1,61 @@
-import { supabase } from './supabaseClient';
-
-// File sharing using Supabase
+// Simple file sharing using localStorage and base64
 export class ShareService {
   static async shareFiles(files: File[]): Promise<string> {
     const shareId = this.generateShareId();
-    const uploadPromises = [];
+    const fileData = [];
     
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fileName = `${shareId}/${i}_${file.name}`;
-      
-      // Upload file to Supabase Storage
-      const uploadPromise = supabase.storage
-        .from('files')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      
-      uploadPromises.push(uploadPromise);
+    for (const file of files) {
+      const base64 = await this.fileToBase64(file);
+      fileData.push({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        data: base64
+      });
     }
     
-    try {
-      await Promise.all(uploadPromises);
-      
-      // Store session metadata in database
-      await supabase
-        .from('sessions')
-        .insert({
-          id: shareId,
-          file_count: files.length,
-          file_names: files.map(f => f.name),
-          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString()
-        });
-      
-      return shareId;
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      throw error;
-    }
+    // Store in localStorage
+    const shareData = {
+      files: fileData,
+      timestamp: Date.now(),
+      expires: Date.now() + (30 * 60 * 1000) // 30 minutes
+    };
+    
+    localStorage.setItem(`share_${shareId}`, JSON.stringify(shareData));
+    
+    // Also try to store in sessionStorage for cross-tab access
+    sessionStorage.setItem(`share_${shareId}`, JSON.stringify(shareData));
+    
+    return shareId;
   }
   
   static async getSharedFiles(shareId: string): Promise<any[]> {
+    // Try localStorage first
+    let shareData = localStorage.getItem(`share_${shareId}`);
+    
+    // Fallback to sessionStorage
+    if (!shareData) {
+      shareData = sessionStorage.getItem(`share_${shareId}`);
+    }
+    
+    if (!shareData) {
+      console.log('No share data found for:', shareId);
+      return [];
+    }
+    
     try {
-      // Get session info
-      const { data: session } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('id', shareId)
-        .single();
+      const data = JSON.parse(shareData);
       
-      if (!session || new Date(session.expires_at) < new Date()) {
+      // Check if expired
+      if (Date.now() > data.expires) {
+        localStorage.removeItem(`share_${shareId}`);
+        sessionStorage.removeItem(`share_${shareId}`);
         return [];
       }
       
-      // Get file URLs
-      const files = [];
-      for (let i = 0; i < session.file_count; i++) {
-        const fileName = `${shareId}/${i}_${session.file_names[i]}`;
-        const { data } = supabase.storage
-          .from('files')
-          .getPublicUrl(fileName);
-        
-        files.push({
-          name: session.file_names[i],
-          url: data.publicUrl
-        });
-      }
-      
-      return files;
+      return data.files;
     } catch (error) {
-      console.error('Error getting shared files:', error);
+      console.error('Error parsing share data:', error);
       return [];
     }
   }

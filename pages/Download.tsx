@@ -25,9 +25,8 @@ export const Download: React.FC = () => {
 
   const downloadFile = (file: any) => {
     const link = document.createElement('a');
-    link.href = file.url;
+    link.href = file.data || file.url;
     link.download = file.name;
-    link.target = '_blank';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -58,7 +57,7 @@ export const Download: React.FC = () => {
                   <span className="material-symbols-outlined text-primary">description</span>
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">{file.name}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">File</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'File'}</p>
                   </div>
                 </div>
                 <button 
@@ -76,6 +75,11 @@ export const Download: React.FC = () => {
             <span className="material-symbols-outlined text-6xl text-gray-400 mb-4">folder_open</span>
             <p className="text-gray-500 dark:text-gray-400">Không có file nào để tải</p>
             <p className="text-sm text-gray-400 mt-2">Mã: {code}</p>
+            <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded text-left text-xs">
+              <p>Debug info:</p>
+              <p>localStorage keys: {Object.keys(localStorage).filter(k => k.startsWith('share_')).join(', ')}</p>
+              <p>sessionStorage keys: {Object.keys(sessionStorage).filter(k => k.startsWith('share_')).join(', ')}</p>
+            </div>
           </div>
         )}
       </div>
