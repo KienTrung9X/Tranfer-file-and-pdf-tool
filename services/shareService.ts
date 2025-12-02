@@ -1,47 +1,78 @@
-// Simple file sharing using URL and localStorage
+import { supabase } from './supabaseClient';
+
+// File sharing using Supabase
 export class ShareService {
   static async shareFiles(files: File[]): Promise<string> {
-    const fileData = [];
+    const shareId = this.generateShareId();
+    const uploadPromises = [];
     
-    for (const file of files) {
-      const base64 = await this.fileToBase64(file);
-      fileData.push({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        data: base64
-      });
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileName = `${shareId}/${i}_${file.name}`;
+      
+      // Upload file to Supabase Storage
+      const uploadPromise = supabase.storage
+        .from('files')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      uploadPromises.push(uploadPromise);
     }
     
-    // Store in localStorage with timestamp
-    const shareId = this.generateShareId();
-    const shareData = {
-      files: fileData,
-      timestamp: Date.now(),
-      expires: Date.now() + (30 * 60 * 1000) // 30 minutes
-    };
-    
-    localStorage.setItem(`share_${shareId}`, JSON.stringify(shareData));
-    
-    // Clean up expired shares
-    this.cleanupExpiredShares();
-    
-    return shareId;
+    try {
+      await Promise.all(uploadPromises);
+      
+      // Store session metadata in database
+      await supabase
+        .from('sessions')
+        .insert({
+          id: shareId,
+          file_count: files.length,
+          file_names: files.map(f => f.name),
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+        });
+      
+      return shareId;
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      throw error;
+    }
   }
   
-  static getSharedFiles(shareId: string): any[] {
-    const shareData = localStorage.getItem(`share_${shareId}`);
-    if (!shareData) return [];
-    
-    const data = JSON.parse(shareData);
-    
-    // Check if expired
-    if (Date.now() > data.expires) {
-      localStorage.removeItem(`share_${shareId}`);
+  static async getSharedFiles(shareId: string): Promise<any[]> {
+    try {
+      // Get session info
+      const { data: session } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('id', shareId)
+        .single();
+      
+      if (!session || new Date(session.expires_at) < new Date()) {
+        return [];
+      }
+      
+      // Get file URLs
+      const files = [];
+      for (let i = 0; i < session.file_count; i++) {
+        const fileName = `${shareId}/${i}_${session.file_names[i]}`;
+        const { data } = supabase.storage
+          .from('files')
+          .getPublicUrl(fileName);
+        
+        files.push({
+          name: session.file_names[i],
+          url: data.publicUrl
+        });
+      }
+      
+      return files;
+    } catch (error) {
+      console.error('Error getting shared files:', error);
       return [];
     }
-    
-    return data.files;
   }
   
   private static fileToBase64(file: File): Promise<string> {
@@ -62,21 +93,5 @@ export class ShareService {
     return result.slice(0, 3) + '-' + result.slice(3);
   }
   
-  private static cleanupExpiredShares(): void {
-    const keys = Object.keys(localStorage);
-    const now = Date.now();
-    
-    keys.forEach(key => {
-      if (key.startsWith('share_')) {
-        try {
-          const data = JSON.parse(localStorage.getItem(key) || '{}');
-          if (data.expires && now > data.expires) {
-            localStorage.removeItem(key);
-          }
-        } catch (e) {
-          localStorage.removeItem(key);
-        }
-      }
-    });
-  }
+
 }

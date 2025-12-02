@@ -5,6 +5,15 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create sessions table for file sharing
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  file_count INTEGER NOT NULL,
+  file_names TEXT[] NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
 -- Create files table for storing file metadata
 CREATE TABLE IF NOT EXISTS files (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -95,6 +104,7 @@ ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pdf_operations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE file_transfers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies (adjust based on your auth method)
 CREATE POLICY "Users can view their own files"
@@ -121,6 +131,15 @@ CREATE POLICY "Users can view their own activity_log"
 CREATE POLICY "Auto-delete expired files"
   ON files FOR DELETE
   USING (expires_at < NOW());
+
+-- Sessions policies for public file sharing
+CREATE POLICY "Allow public read sessions"
+  ON sessions FOR SELECT
+  USING (true);
+
+CREATE POLICY "Allow public insert sessions"
+  ON sessions FOR INSERT
+  WITH CHECK (true);
 
 -- Alternative: Create a scheduled job on Supabase (use pg_cron extension if available)
 -- This requires pg_cron extension to be enabled on your Supabase project

@@ -8,10 +8,10 @@ export const Download: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadFiles = () => {
+    const loadFiles = async () => {
       if (code) {
         try {
-          const sharedFiles = ShareService.getSharedFiles(code);
+          const sharedFiles = await ShareService.getSharedFiles(code);
           setFiles(sharedFiles);
         } catch (error) {
           console.error('Error loading files:', error);
@@ -25,8 +25,9 @@ export const Download: React.FC = () => {
 
   const downloadFile = (file: any) => {
     const link = document.createElement('a');
-    link.href = file.data;
+    link.href = file.url;
     link.download = file.name;
+    link.target = '_blank';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -57,7 +58,7 @@ export const Download: React.FC = () => {
                   <span className="material-symbols-outlined text-primary">description</span>
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">{file.name}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">File</p>
                   </div>
                 </div>
                 <button 
