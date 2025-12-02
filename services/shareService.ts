@@ -1,4 +1,4 @@
-// Simple file sharing using localStorage and base64
+// Simple file sharing using URL encoding
 export class ShareService {
   static async shareFiles(files: File[]): Promise<string> {
     const shareId = this.generateShareId();
@@ -14,7 +14,7 @@ export class ShareService {
       });
     }
     
-    // Store in localStorage
+    // Store in both localStorage and create encoded URL
     const shareData = {
       files: fileData,
       timestamp: Date.now(),
@@ -22,20 +22,52 @@ export class ShareService {
     };
     
     localStorage.setItem(`share_${shareId}`, JSON.stringify(shareData));
-    
-    // Also try to store in sessionStorage for cross-tab access
     sessionStorage.setItem(`share_${shareId}`, JSON.stringify(shareData));
+    
+    // Also encode small files directly in URL for cross-device sharing
+    try {
+      const compressedData = btoa(JSON.stringify(shareData));
+      if (compressedData.length < 2000) { // URL length limit
+        sessionStorage.setItem(`url_${shareId}`, compressedData);
+      }
+    } catch (e) {
+      console.log('Data too large for URL encoding');
+    }
     
     return shareId;
   }
   
   static async getSharedFiles(shareId: string): Promise<any[]> {
-    // Try localStorage first
+    // Try multiple sources
     let shareData = localStorage.getItem(`share_${shareId}`);
     
-    // Fallback to sessionStorage
     if (!shareData) {
       shareData = sessionStorage.getItem(`share_${shareId}`);
+    }
+    
+    // Try URL encoded data
+    if (!shareData) {
+      const urlData = sessionStorage.getItem(`url_${shareId}`);
+      if (urlData) {
+        try {
+          shareData = atob(urlData);
+        } catch (e) {
+          console.error('Error decoding URL data:', e);
+        }
+      }
+    }
+    
+    // Try URL parameters (for direct links)
+    if (!shareData) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const encodedData = urlParams.get('data');
+      if (encodedData) {
+        try {
+          shareData = atob(encodedData);
+        } catch (e) {
+          console.error('Error decoding URL parameter:', e);
+        }
+      }
     }
     
     if (!shareData) {
@@ -48,8 +80,7 @@ export class ShareService {
       
       // Check if expired
       if (Date.now() > data.expires) {
-        localStorage.removeItem(`share_${shareId}`);
-        sessionStorage.removeItem(`share_${shareId}`);
+        this.cleanupShare(shareId);
         return [];
       }
       
@@ -58,6 +89,12 @@ export class ShareService {
       console.error('Error parsing share data:', error);
       return [];
     }
+  }
+  
+  private static cleanupShare(shareId: string): void {
+    localStorage.removeItem(`share_${shareId}`);
+    sessionStorage.removeItem(`share_${shareId}`);
+    sessionStorage.removeItem(`url_${shareId}`);
   }
   
   private static fileToBase64(file: File): Promise<string> {

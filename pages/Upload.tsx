@@ -8,16 +8,7 @@ export const Upload: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  useEffect(() => {
-    // Generate a random 6-character code
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let result = '';
-    for (let i = 0; i < 6; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    const formattedCode = result.slice(0, 3) + '-' + result.slice(3);
-    setSessionCode(formattedCode);
-  }, []);
+  // Remove auto-generation of session code
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -68,8 +59,8 @@ export const Upload: React.FC = () => {
     }
   };
 
-  // Generate QR code URL using a public API
-  const downloadUrl = sessionCode ? `${window.location.origin}/#/download/${sessionCode}` : '';
+  // Generate QR code URL only when there are files
+  const downloadUrl = sessionCode && uploadedFiles.length > 0 ? `${window.location.origin}/#/download/${sessionCode}` : '';
   const qrUrl = downloadUrl 
     ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(downloadUrl)}&color=000000&bgcolor=ffffff`
     : '';
@@ -146,40 +137,52 @@ export const Upload: React.FC = () => {
           {/* Connect Device Area */}
           <div className="flex flex-col rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/5 lg:col-span-2">
             <div className="flex h-full flex-col items-center justify-center gap-6 p-6 sm:p-8">
-              <div className="flex flex-col items-center gap-2 text-center">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Kết nối thiết bị di động</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Quét mã QR hoặc nhập mã trên điện thoại để kết nối.</p>
-              </div>
-              
-              <div className="flex h-40 w-40 items-center justify-center rounded-lg bg-white p-2">
-                {qrUrl ? (
-                  <img
-                    src={qrUrl}
-                    alt="QR code for mobile connection"
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-gray-200 animate-pulse rounded"></div>
-                )}
-              </div>
-              
-              <div className="flex w-full max-w-xs flex-col items-center gap-3">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Mã của bạn (Hết hạn sau 30p)</p>
-                <div className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-background-light p-3 dark:border-white/10 dark:bg-background-dark">
-                  <span className="flex-1 text-center text-xl font-semibold tracking-widest text-gray-700 dark:text-gray-300">
-                    {sessionCode || '...'}
-                  </span>
-                  <button 
-                    onClick={copyToClipboard}
-                    className="relative flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white" 
-                    title="Sao chép"
-                  >
-                    <span className="material-symbols-outlined text-xl">
-                      {showCopyFeedback ? 'check' : 'content_copy'}
-                    </span>
-                  </button>
+              {uploadedFiles.length > 0 ? (
+                <>
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Tải về trên điện thoại</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Quét mã QR để tải files về điện thoại</p>
+                  </div>
+                  
+                  <div className="flex h-40 w-40 items-center justify-center rounded-lg bg-white p-2">
+                    {qrUrl ? (
+                      <img
+                        src={qrUrl}
+                        alt="QR code for download"
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-gray-200 animate-pulse rounded"></div>
+                    )}
+                  </div>
+                  
+                  <div className="flex w-full max-w-xs flex-col items-center gap-3">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Mã tải về (Hết hạn sau 30p)</p>
+                    <div className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-background-light p-3 dark:border-white/10 dark:bg-background-dark">
+                      <span className="flex-1 text-center text-xl font-semibold tracking-widest text-gray-700 dark:text-gray-300">
+                        {sessionCode}
+                      </span>
+                      <button 
+                        onClick={copyToClipboard}
+                        className="relative flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white" 
+                        title="Sao chép"
+                      >
+                        <span className="material-symbols-outlined text-xl">
+                          {showCopyFeedback ? 'check' : 'content_copy'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-4 text-center py-8">
+                  <span className="material-symbols-outlined text-6xl text-gray-300">qr_code_scanner</span>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Chưa có file</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Tải file lên để tạo mã QR</p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
