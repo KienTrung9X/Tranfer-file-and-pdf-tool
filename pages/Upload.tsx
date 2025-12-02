@@ -7,6 +7,8 @@ export const Upload: React.FC = () => {
   const [showCopyFeedback, setShowCopyFeedback] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentFileName, setCurrentFileName] = useState('');
 
   // Remove auto-generation of session code
 
@@ -29,18 +31,33 @@ export const Upload: React.FC = () => {
 
   const handleFiles = async (files: File[]) => {
     setIsUploading(true);
+    setUploadProgress(0);
+    
     try {
       const newFiles = [...uploadedFiles, ...files];
+      
+      // Upload with progress tracking
+      const shareId = await ShareService.shareFiles(newFiles, {
+        onProgress: (progress: number, fileName: string) => {
+          setUploadProgress(progress);
+          setCurrentFileName(fileName);
+        }
+      });
+      
       setUploadedFiles(newFiles);
-      
-      // Generate new share ID for all files
-      const shareId = await ShareService.shareFiles(newFiles);
       setSessionCode(shareId);
+      setUploadProgress(100);
       
-      setIsUploading(false);
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+        setCurrentFileName('');
+      }, 1000);
     } catch (error) {
       console.error('Error sharing files:', error);
       setIsUploading(false);
+      setUploadProgress(0);
+      setCurrentFileName('');
     }
   };
 
@@ -112,7 +129,26 @@ export const Upload: React.FC = () => {
                 </label>
               </div>
               
-              {uploadedFiles.length > 0 && (
+              {isUploading && (
+                <div className="w-full space-y-3">
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                      Đang tải lên: {currentFileName}
+                    </p>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <div 
+                        className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {uploadProgress.toFixed(0)}%
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {uploadedFiles.length > 0 && !isUploading && (
                 <div className="w-full space-y-2">
                   <h4 className="font-medium text-gray-900 dark:text-white">Files đã tải lên:</h4>
                   {uploadedFiles.map((file, index) => (

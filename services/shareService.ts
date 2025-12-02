@@ -1,73 +1,123 @@
-// Simple file sharing using URL encoding
+import { supabase } from './supabaseClient';
+
+// File sharing using Supabase with progress tracking
 export class ShareService {
-  static async shareFiles(files: File[]): Promise<string> {
+  static async shareFiles(files: File[], options?: { onProgress?: (progress: number, fileName: string) => void }): Promise<string> {
     const shareId = this.generateShareId();
-    const fileData = [];
+    const { onProgress } = options || {};
     
-    for (const file of files) {
-      const base64 = await this.fileToBase64(file);
-      fileData.push({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        data: base64
-      });
-    }
-    
-    // Store in both localStorage and create encoded URL
-    const shareData = {
-      files: fileData,
-      timestamp: Date.now(),
-      expires: Date.now() + (30 * 60 * 1000) // 30 minutes
-    };
-    
-    localStorage.setItem(`share_${shareId}`, JSON.stringify(shareData));
-    sessionStorage.setItem(`share_${shareId}`, JSON.stringify(shareData));
-    
-    // Also encode small files directly in URL for cross-device sharing
     try {
-      const compressedData = btoa(JSON.stringify(shareData));
-      if (compressedData.length < 2000) { // URL length limit
-        sessionStorage.setItem(`url_${shareId}`, compressedData);
+      // Upload files to Supabase Storage
+      const uploadPromises = files.map(async (file, index) => {
+        const fileName = `${shareId}/${index}_${file.name}`;
+        
+        if (onProgress) {
+          onProgress((index / files.length) * 50, file.name);
+        }
+        
+        const { data, error } = await supabase.storage
+          .from('files')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+        
+        if (error) throw error;
+        return { name: file.name, path: fileName };
+      });
+      
+      const uploadResults = await Promise.all(uploadPromises);
+      
+      if (onProgress) {
+        onProgress(75, 'Lưu thông tin session...');
       }
-    } catch (e) {
-      console.log('Data too large for URL encoding');
+      
+      // Store session metadata
+      const { error: dbError } = await supabase
+        .from('sessions')
+        .insert({
+          id: shareId,
+          file_count: files.length,
+          file_names: files.map(f => f.name),
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+        });
+      
+      if (dbError) throw dbError;
+      
+      if (onProgress) {
+        onProgress(100, 'Hoàn thành!');
+      }
+      
+      return shareId;
+    } catch (error) {
+      console.error('Supabase upload failed, using fallback:', error);
+      
+      // Fallback to localStorage
+      const fileData = [];
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (onProgress) {
+          onProgress((i / files.length) * 100, file.name);
+        }
+        
+        const base64 = await this.fileToBase64(file);
+        fileData.push({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          data: base64
+        });
+      }
+      
+      const shareData = {
+        files: fileData,
+        timestamp: Date.now(),
+        expires: Date.now() + (30 * 60 * 1000)
+      };
+      
+      localStorage.setItem(`share_${shareId}`, JSON.stringify(shareData));
+      sessionStorage.setItem(`share_${shareId}`, JSON.stringify(shareData));
+      
+      return shareId;
     }
-    
-    return shareId;
   }
   
   static async getSharedFiles(shareId: string): Promise<any[]> {
-    // Try multiple sources
+    try {
+      // Try Supabase first
+      const { data: session, error } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('id', shareId)
+        .single();
+      
+      if (!error && session && new Date(session.expires_at) > new Date()) {
+        // Get file URLs from Supabase Storage
+        const files = [];
+        for (let i = 0; i < session.file_count; i++) {
+          const fileName = `${shareId}/${i}_${session.file_names[i]}`;
+          const { data } = supabase.storage
+            .from('files')
+            .getPublicUrl(fileName);
+          
+          files.push({
+            name: session.file_names[i],
+            url: data.publicUrl,
+            size: 0 // Size not stored in this version
+          });
+        }
+        return files;
+      }
+    } catch (error) {
+      console.log('Supabase fetch failed, trying fallback:', error);
+    }
+    
+    // Fallback to localStorage
     let shareData = localStorage.getItem(`share_${shareId}`);
     
     if (!shareData) {
       shareData = sessionStorage.getItem(`share_${shareId}`);
-    }
-    
-    // Try URL encoded data
-    if (!shareData) {
-      const urlData = sessionStorage.getItem(`url_${shareId}`);
-      if (urlData) {
-        try {
-          shareData = atob(urlData);
-        } catch (e) {
-          console.error('Error decoding URL data:', e);
-        }
-      }
-    }
-    
-    // Try URL parameters (for direct links)
-    if (!shareData) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const encodedData = urlParams.get('data');
-      if (encodedData) {
-        try {
-          shareData = atob(encodedData);
-        } catch (e) {
-          console.error('Error decoding URL parameter:', e);
-        }
-      }
     }
     
     if (!shareData) {
@@ -78,7 +128,6 @@ export class ShareService {
     try {
       const data = JSON.parse(shareData);
       
-      // Check if expired
       if (Date.now() > data.expires) {
         this.cleanupShare(shareId);
         return [];
