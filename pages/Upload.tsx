@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react';
+import { ShareService } from '../services/shareService';
 
 export const Upload: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
@@ -35,13 +36,21 @@ export const Upload: React.FC = () => {
     handleFiles(files);
   }, []);
 
-  const handleFiles = (files: File[]) => {
+  const handleFiles = async (files: File[]) => {
     setIsUploading(true);
-    // Simulate upload delay
-    setTimeout(() => {
-      setUploadedFiles(prev => [...prev, ...files]);
+    try {
+      const newFiles = [...uploadedFiles, ...files];
+      setUploadedFiles(newFiles);
+      
+      // Generate new share ID for all files
+      const shareId = await ShareService.shareFiles(newFiles);
+      setSessionCode(shareId);
+      
       setIsUploading(false);
-    }, 1000);
+    } catch (error) {
+      console.error('Error sharing files:', error);
+      setIsUploading(false);
+    }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
