@@ -4,6 +4,8 @@ export const Upload: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [sessionCode, setSessionCode] = useState('');
   const [showCopyFeedback, setShowCopyFeedback] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     // Generate a random 6-character code
@@ -29,10 +31,25 @@ export const Upload: React.FC = () => {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    // Handle file drop logic here
-    console.log('Files dropped:', e.dataTransfer.files);
-    alert(`Đã nhận ${e.dataTransfer.files.length} file. Kiểm tra console.`);
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
   }, []);
+
+  const handleFiles = (files: File[]) => {
+    setIsUploading(true);
+    // Simulate upload delay
+    setTimeout(() => {
+      setUploadedFiles(prev => [...prev, ...files]);
+      setIsUploading(false);
+    }, 1000);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      handleFiles(files);
+    }
+  };
 
   const copyToClipboard = () => {
     if (sessionCode) {
@@ -43,8 +60,9 @@ export const Upload: React.FC = () => {
   };
 
   // Generate QR code URL using a public API
-  const qrUrl = sessionCode 
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(sessionCode)}&color=000000&bgcolor=ffffff`
+  const downloadUrl = sessionCode ? `${window.location.origin}/#/download/${sessionCode}` : '';
+  const qrUrl = downloadUrl 
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(downloadUrl)}&color=000000&bgcolor=ffffff`
     : '';
 
   return (
@@ -89,10 +107,25 @@ export const Upload: React.FC = () => {
                 </div>
                 
                 <label className="flex h-11 min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-primary px-5 text-base font-bold text-white shadow-sm transition-all hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-                  <span>Chọn file</span>
-                  <input type="file" className="hidden" multiple onChange={(e) => console.log(e.target.files)} />
+                  <span>{isUploading ? 'Đang tải...' : 'Chọn file'}</span>
+                  <input type="file" className="hidden" multiple onChange={handleFileInput} disabled={isUploading} />
                 </label>
               </div>
+              
+              {uploadedFiles.length > 0 && (
+                <div className="w-full space-y-2">
+                  <h4 className="font-medium text-gray-900 dark:text-white">Files đã tải lên:</h4>
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-green-600">check_circle</span>
+                        <span className="text-sm font-medium">{file.name}</span>
+                        <span className="text-xs text-gray-500">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               
               <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 rounded-md text-sm">
                 <span className="material-symbols-outlined text-lg">timer</span>

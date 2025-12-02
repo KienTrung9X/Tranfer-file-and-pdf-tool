@@ -2,6 +2,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Upload } from './pages/Upload';
+import { Download } from './pages/Download';
 import { PdfTools } from './pages/PdfTools';
 import { SplitPdf } from './pages/SplitPdf';
 import { RotatePdf } from './pages/RotatePdf';
@@ -15,6 +16,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Navigate to="/upload" replace />} />
             <Route path="/upload" element={<Upload />} />
+            <Route path="/download/:code" element={<Download />} />
             
             {/* PDF Tools Routes */}
             <Route path="/pdf-tools" element={<PdfTools />} />
